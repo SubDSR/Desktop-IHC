@@ -1,12 +1,11 @@
 """
-Vista de citas - Versión Simplificada con Drag & Drop FUNCIONAL
+Vista de citas - Versión Completa Mejorada con diseño legible y Drag & Drop
 """
 
 import customtkinter as ctk
 from tkinter import messagebox
 from datetime import datetime
 from utils.mock_data import CITAS, MASCOTAS, VETERINARIOS, get_mascota_by_id, get_veterinario_by_id
-from views.components.data_table import DataTable
 from utils.animations import NotificationManager
 from utils.event_manager import AppContext, AppEvents
 
@@ -65,7 +64,7 @@ class CitaFormDialog(ctk.CTkToplevel):
         form = ctk.CTkScrollableFrame(main)
         form.pack(fill="both", expand=True)
         
-        # Fecha
+        # Fecha y Hora
         fecha_frame = ctk.CTkFrame(form, fg_color="transparent")
         fecha_frame.pack(fill="x", pady=5)
         
@@ -138,13 +137,11 @@ class CitaFormDialog(ctk.CTkToplevel):
             self.observaciones_text.insert("1.0", self.cita.get('observaciones', ''))
             self.estado_combo.set(self.cita.get('estado', 'Programada'))
             
-            # Mascota
             mascota = get_mascota_by_id(self.cita.get('id_mascota'))
             if mascota:
                 valor = f"{mascota['nombre_mascota']} - {mascota['especie']} ({mascota['id_mascota']})"
                 self.mascota_combo.set(valor)
             
-            # Veterinario
             vet = get_veterinario_by_id(self.cita.get('id_veterinario'))
             if vet:
                 valor = f"Dr(a). {vet['nombres']} {vet['apellidos']} - {vet['especialidad']}"
@@ -168,12 +165,10 @@ class CitaFormDialog(ctk.CTkToplevel):
             messagebox.showerror("Error", "El motivo es obligatorio")
             return
         
-        # Extraer IDs
         mascota_str = self.mascota_combo.get()
         id_mascota = int(mascota_str.split('(')[-1].replace(')', ''))
         
         vet_str = self.veterinario_combo.get()
-        # Buscar veterinario por nombre
         vet = next((v for v in VETERINARIOS if f"{v['nombres']} {v['apellidos']}" in vet_str), None)
         if not vet:
             messagebox.showerror("Error", "Veterinario no encontrado")
@@ -202,7 +197,7 @@ class CitaFormDialog(ctk.CTkToplevel):
 
 
 class CitasViewSimple(ctk.CTkScrollableFrame):
-    """Vista de citas con drag-and-drop"""
+    """Vista de citas con diseño mejorado y Drag & Drop"""
     
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=app.theme.COLORS["bg"])
@@ -268,7 +263,7 @@ class CitasViewSimple(ctk.CTkScrollableFrame):
         tip_frame.pack(fill="x", padx=20, pady=10)
         ctk.CTkLabel(
             tip_frame,
-            text="💡 TIP: Haz clic sobre una fila, mantén presionado y arrastra para reorganizar las citas",
+            text="💡 Arrastra las filas para reordenar las prioridades (mantén clic y arrastra)",
             font=ctk.CTkFont(size=12),
             text_color="#1e40af"
         ).pack(pady=10)
@@ -293,63 +288,197 @@ class CitasViewSimple(ctk.CTkScrollableFrame):
         ctk.CTkButton(search_frame, text="🗑️ Limpiar", command=self._clear_filters, fg_color="#6b7280", hover_color="#4b5563", width=100).pack(side="left", padx=5)
         
         # Contenedor tabla
-        self.table_container = ctk.CTkFrame(self, fg_color=self.theme.COLORS["surface"])
+        self.table_container = ctk.CTkFrame(self, fg_color=self.theme.COLORS["surface"], corner_radius=10)
         self.table_container.pack(fill="both", expand=True, padx=20, pady=10)
         
         self.count_label = ctk.CTkLabel(self.table_container, text="", font=ctk.CTkFont(size=12), text_color=self.theme.TEXT_SECONDARY)
         self.count_label.pack(pady=10)
+        
+        # Frame para las filas
+        self.rows_frame = ctk.CTkFrame(self.table_container, fg_color="transparent")
+        self.rows_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
     
     def _update_table(self):
-        """Actualizar tabla"""
-        for widget in self.table_container.winfo_children():
-            if isinstance(widget, DataTable):
-                widget.destroy()
+        """Actualizar tabla con diseño mejorado"""
+        for widget in self.rows_frame.winfo_children():
+            widget.destroy()
         
-        self.count_label.pack(pady=10)
-        self.count_label.configure(text=f"Mostrando {len(self.filtered_citas)} de {len(self.citas)} citas")
+        self.count_label.configure(text=f"📋 Mostrando {len(self.filtered_citas)} de {len(self.citas)} citas")
         
-        columns = ["N°", "Fecha", "Hora", "Mascota", "Veterinario", "Motivo", "Estado", "Acciones"]
+        # Header de la tabla
+        header_row = ctk.CTkFrame(self.rows_frame, fg_color=self.theme.ACCENT, height=45, corner_radius=8)
+        header_row.pack(fill="x", pady=(0, 5))
+        header_row.grid_columnconfigure((0, 1, 2, 3, 4, 5), weight=1)
         
-        # Colores para badges de estado
-        estado_colors = {
-            "Programada": {"bg": "#3b82f6", "text": "white"},  # Azul
-            "Atendida": {"bg": "#10b981", "text": "white"},    # Verde
-            "Cancelada": {"bg": "#6b7280", "text": "white"}    # Gris
+        headers = ["📅 Fecha", "⏰ Hora", "🐾 Mascota", "💬 Motivo", "📊 Estado", "⚙️ Acciones"]
+        for i, header in enumerate(headers):
+            lbl = ctk.CTkLabel(
+                header_row,
+                text=header,
+                text_color="white",
+                font=ctk.CTkFont(size=12, weight="bold")
+            )
+            lbl.grid(row=0, column=i, sticky="ew", padx=8, pady=10)
+        
+        # Renderizar filas
+        for index, cita in enumerate(self.filtered_citas):
+            self._create_row(index, cita)
+    
+    def _create_row(self, index, cita):
+        """Crear una fila con diseño mejorado y bordes visibles"""
+        mascota = get_mascota_by_id(cita['id_mascota'])
+        mascota_nom = mascota['nombre_mascota'] if mascota else "Desconocido"
+        
+        # Color de borde según estado (más oscuros para mejor visibilidad)
+        border_colors = {
+            'Programada': "#2563eb",  # Azul oscuro
+            'Atendida': "#059669",    # Verde oscuro
+            'Cancelada': "#dc2626"    # Rojo oscuro
         }
+        border = border_colors.get(cita['estado'], "#94a3b8")
         
-        self.table = DataTable(self.table_container, columns=columns, theme=self.theme, height=400)
-        self.table.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        # Color de fondo con tinte según estado
+        bg_colors = {
+            'Programada': "#eff6ff",  # Azul muy claro
+            'Atendida': "#f0fdf4",    # Verde muy claro
+            'Cancelada': "#fef2f2"    # Rojo muy claro
+        }
+        bg_color = bg_colors.get(cita['estado'], "white")
         
-        for idx, cita in enumerate(self.filtered_citas, 1):
-            mascota = get_mascota_by_id(cita['id_mascota'])
-            vet = get_veterinario_by_id(cita['id_veterinario'])
-            
-            mascota_nombre = mascota['nombre_mascota'] if mascota else "N/A"
-            vet_nombre = f"Dr. {vet['apellidos']}" if vet else "N/A"
-            
-            row_data = [
-                str(idx),
-                cita['fecha'],
-                cita['hora'],
-                mascota_nombre,
-                vet_nombre,
-                cita['motivo'][:30] + "..." if len(cita['motivo']) > 30 else cita['motivo'],
-                cita['estado']
-            ]
-            
-            actions = [
-                ("👁️", lambda c=cita: self._view_cita(c), self.theme.INFO),
-                ("✏️", lambda c=cita: self._edit_cita(c), self.theme.ACCENT),
-                ("🗑️", lambda c=cita: self._delete_cita(c), self.theme.DANGER)
-            ]
-            
-            # Agregar fila con colores de estado y binding para drag
-            row_frame = self.table.add_row(row_data, actions, estado_colors)
-            self._setup_drag_drop(row_frame, cita, idx - 1)
+        # Frame de la fila con borde grueso y visible
+        row = ctk.CTkFrame(
+            self.rows_frame,
+            fg_color=bg_color,
+            corner_radius=10,
+            border_width=3,  # Borde más grueso
+            border_color=border,
+            height=65
+        )
+        row.pack(fill="x", pady=4, padx=5)  # Más espacio entre filas
+        row.grid_columnconfigure((0, 1, 2, 3, 4, 5), weight=1)
+        
+        # Fecha con badge visual
+        fecha_frame = ctk.CTkFrame(row, fg_color="transparent")
+        fecha_frame.grid(row=0, column=0, pady=12, padx=8)
+        
+        ctk.CTkLabel(
+            fecha_frame,
+            text=cita['fecha'],
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color="#1e293b"
+        ).pack()
+        
+        # Hora
+        ctk.CTkLabel(
+            row,
+            text=cita['hora'],
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#475569"
+        ).grid(row=0, column=1, pady=12, padx=8)
+        
+        # Mascota con ícono
+        mascota_frame = ctk.CTkFrame(row, fg_color="transparent")
+        mascota_frame.grid(row=0, column=2, pady=12, padx=8)
+        
+        ctk.CTkLabel(
+            mascota_frame,
+            text=f"🐾 {mascota_nom}",
+            font=ctk.CTkFont(size=11),
+            text_color="#475569"
+        ).pack()
+        
+        # Motivo (truncado)
+        motivo_corto = cita['motivo'][:22] + "..." if len(cita['motivo']) > 22 else cita['motivo']
+        ctk.CTkLabel(
+            row,
+            text=motivo_corto,
+            font=ctk.CTkFont(size=11),
+            text_color="#64748b"
+        ).grid(row=0, column=3, pady=12, padx=8)
+        
+        # Badge Estado con más contraste
+        estado_colors = {
+            "Programada": ("#2563eb", "white"),   # Azul oscuro
+            "Atendida": ("#059669", "white"),     # Verde oscuro
+            "Cancelada": ("#dc2626", "white")     # Rojo oscuro
+        }
+        bg_color_badge, text_color = estado_colors.get(cita['estado'], ("#64748B", "white"))
+        
+        badge = ctk.CTkLabel(
+            row,
+            text=cita['estado'],
+            text_color=text_color,
+            fg_color=bg_color_badge,
+            corner_radius=15,
+            width=95,
+            height=30,
+            font=ctk.CTkFont(size=11, weight="bold")
+        )
+        badge.grid(row=0, column=4, pady=12, padx=8)
+        
+        # Botones de Acciones
+        actions = ctk.CTkFrame(row, fg_color="transparent")
+        actions.grid(row=0, column=5, pady=12, padx=8)
+        
+        # Botón Ver
+        btn_view = ctk.CTkButton(
+            actions,
+            text="👁️",
+            width=38,
+            height=32,
+            fg_color="#3b82f6",
+            hover_color="#2563eb",
+            font=ctk.CTkFont(size=14),
+            command=lambda: self._view_cita(cita)
+        )
+        btn_view.pack(side="left", padx=2)
+        
+        # Botón Editar
+        btn_edit = ctk.CTkButton(
+            actions,
+            text="✏️",
+            width=38,
+            height=32,
+            fg_color="#8b5cf6",
+            hover_color="#7c3aed",
+            font=ctk.CTkFont(size=14),
+            command=lambda: self._edit_cita(cita)
+        )
+        btn_edit.pack(side="left", padx=2)
+        
+        # Botón Eliminar
+        btn_delete = ctk.CTkButton(
+            actions,
+            text="🗑️",
+            width=38,
+            height=32,
+            fg_color="#ef4444",
+            hover_color="#dc2626",
+            font=ctk.CTkFont(size=14),
+            command=lambda: self._delete_cita(cita)
+        )
+        btn_delete.pack(side="left", padx=2)
+        
+        # Setup Drag & Drop
+        self._setup_drag_drop(row, cita, index)
+        
+        return row
     
     def _setup_drag_drop(self, row_frame, cita, index):
-        """Configurar drag-and-drop mejorado en una fila"""
+        """Configurar drag-and-drop con efectos visuales mejorados"""
         dragging_data = {"active": False, "start_y": 0, "start_index": index}
+        
+        # Guardar colores originales
+        original_border_colors = {
+            'Programada': "#2563eb",
+            'Atendida': "#059669",
+            'Cancelada': "#dc2626"
+        }
+        original_bg_colors = {
+            'Programada': "#eff6ff",
+            'Atendida': "#f0fdf4",
+            'Cancelada': "#fef2f2"
+        }
         
         def on_press(event):
             dragging_data["active"] = True
@@ -358,72 +487,76 @@ class CitasViewSimple(ctk.CTkScrollableFrame):
             self.dragging_row = cita
             self.drag_start_y = event.y_root
             
-            # Efecto visual de inicio
+            # Efecto visual de arrastre: fondo amarillo claro y borde púrpura grueso
             row_frame.configure(
                 cursor="fleur",
-                fg_color="#e0e7ff",
-                border_width=2,
-                border_color="#3b82f6"
+                fg_color="#fef3c7",  # Amarillo claro
+                border_width=4,      # Borde más grueso
+                border_color="#8b5cf6"  # Púrpura brillante
             )
-            row_frame.lift()  # Traer al frente
+            row_frame.lift()
         
         def on_motion(event):
             if dragging_data["active"]:
                 delta_y = event.y_root - dragging_data["start_y"]
                 
-                # Cambiar color del borde según dirección
+                # Cambiar color de borde según dirección
                 if delta_y < -20:
-                    row_frame.configure(border_color="#8b5cf6")  # Púrpura arriba
+                    row_frame.configure(border_color="#3b82f6")  # Azul (arriba)
                 elif delta_y > 20:
-                    row_frame.configure(border_color="#f59e0b")  # Naranja abajo
+                    row_frame.configure(border_color="#f59e0b")  # Naranja (abajo)
                 else:
-                    row_frame.configure(border_color="#3b82f6")  # Azul
+                    row_frame.configure(border_color="#8b5cf6")  # Púrpura (neutral)
         
         def on_release(event):
             if dragging_data["active"]:
+                # Restaurar apariencia original
+                original_border = original_border_colors.get(cita['estado'], "#94a3b8")
+                original_bg = original_bg_colors.get(cita['estado'], "white")
+                
                 row_frame.configure(
                     cursor="arrow",
-                    fg_color="transparent",
-                    border_width=0
+                    fg_color=original_bg,
+                    border_width=3,
+                    border_color=original_border
                 )
                 
                 # Calcular movimiento
                 delta_y = event.y_root - dragging_data["start_y"]
                 
-                if abs(delta_y) > 40:  # Umbral mínimo
-                    # Calcular filas movidas (~60px por fila)
-                    rows_moved = int(delta_y / 60)
+                if abs(delta_y) > 40:
+                    rows_moved = int(delta_y / 69)  # ~69px por fila (65 altura + 4 padding)
                     new_index = max(0, min(
                         len(self.filtered_citas) - 1,
                         dragging_data["start_index"] + rows_moved
                     ))
                     
                     if new_index != dragging_data["start_index"]:
-                        # Reordenar lista
                         cita_to_move = self.filtered_citas.pop(dragging_data["start_index"])
                         self.filtered_citas.insert(new_index, cita_to_move)
                         
-                        # Actualizar vista
                         self._update_table()
                         
-                        # Notificación
-                        direction = "arriba" if rows_moved < 0 else "abajo"
+                        direction = "arriba ⬆️" if rows_moved < 0 else "abajo ⬇️"
                         NotificationManager.show_success(
                             self,
-                            f"✓ Cita movida {abs(rows_moved)} posición(es) hacia {direction}"
+                            f"✓ Prioridad reordenada: {abs(rows_moved)} posición(es) hacia {direction}"
                         )
                 
                 self.dragging_row = None
                 dragging_data["active"] = False
         
-        # Cambiar cursor al pasar
         def on_enter(event):
             if not dragging_data["active"]:
-                row_frame.configure(cursor="grab")
+                row_frame.configure(cursor="hand2")  # Cambiado de "grab" a "hand2"
+                # Efecto hover: aumentar grosor del borde
+                row_frame.configure(border_width=4)
         
         def on_leave(event):
             if not dragging_data["active"]:
                 row_frame.configure(cursor="arrow")
+                # Restaurar grosor original
+                row_frame.configure(border_width=3)
         
         row_frame.bind("<Button-1>", on_press)
         row_frame.bind("<B1-Motion>", on_motion)

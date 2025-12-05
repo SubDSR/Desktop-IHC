@@ -1,5 +1,5 @@
 """
-Formulario de Cliente - Mejorado con validación en tiempo real
+Formulario de Cliente - Completo con validación visual
 """
 
 import customtkinter as ctk
@@ -7,26 +7,25 @@ from tkinter import messagebox
 from utils.validators import Validator
 from utils.animations import NotificationManager
 from utils.event_manager import AppEvents
-from utils.mock_data import MASCOTAS, get_mascotas_by_cliente
+from utils.mock_data import get_mascotas_by_cliente
 
 
 class ValidatedEntry(ctk.CTkEntry):
-    """Entry con validación en tiempo real"""
+    """Entry con validación visual en tiempo real"""
     
-    def __init__(self, parent, validator_func=None, validator_type=None, **kwargs):
+    def __init__(self, parent, validator_func=None, **kwargs):
         super().__init__(parent, **kwargs)
         self.validator_func = validator_func
-        self.validator_type = validator_type
         self.is_valid = False
         
         # Validar mientras escribe
         self.bind("<KeyRelease>", self._on_change)
     
     def _on_change(self, event=None):
-        """Validar en tiempo real"""
+        """Validar en tiempo real con colores"""
         value = self.get().strip()
         
-        # Si está vacío, borde gris
+        # Si está vacío, borde gris (neutral)
         if not value:
             self.configure(border_color="#cbd5e1", border_width=2)
             self.is_valid = False
@@ -46,7 +45,7 @@ class ValidatedEntry(ctk.CTkEntry):
             self.is_valid = True
     
     def validate(self):
-        """Validar al enviar"""
+        """Validar al enviar (guardar)"""
         value = self.get().strip()
         
         if not value:
@@ -60,34 +59,29 @@ class ValidatedEntry(ctk.CTkEntry):
             return is_valid, error_message
         
         return True, None
-    
-    def reset_validation(self):
-        """Resetear validación"""
-        self.configure(border_color="#cbd5e1", border_width=2)
-        self.is_valid = False
 
 
 class ClienteFormDialog(ctk.CTkToplevel):
-    """Formulario de cliente mejorado"""
+    """Formulario de cliente completo y mejorado"""
     
     def __init__(self, parent, mode, cliente, theme, event_manager):
         super().__init__(parent)
         
-        self.mode = mode  # "new", "edit", "view"
+        self.mode = mode  # "add", "edit", "view"
         self.cliente = cliente
         self.theme = theme
         self.event_manager = event_manager
         
         # Configuración de ventana
         self.title(self._get_title())
-        self.geometry("650x750")
+        self.geometry("650x800")
         self.resizable(False, False)
         
         # Centrar ventana
         self.update_idletasks()
         x = (self.winfo_screenwidth() // 2) - (650 // 2)
-        y = (self.winfo_screenheight() // 2) - (750 // 2)
-        self.geometry(f"650x750+{x}+{y}")
+        y = (self.winfo_screenheight() // 2) - (400)
+        self.geometry(f"650x800+{x}+{y}")
         
         # Hacer modal
         self.transient(parent)
@@ -101,28 +95,20 @@ class ClienteFormDialog(ctk.CTkToplevel):
     def _get_title(self):
         """Obtener título según modo"""
         titles = {
-            "new": "Registrar Nuevo Cliente",
-            "edit": "Modificar Cliente",
-            "view": "Detalles del Cliente"
+            "add": "➕ Registrar Nuevo Cliente",
+            "edit": "✏️ Modificar Cliente",
+            "view": "👁️ Detalles del Cliente"
         }
         return titles.get(self.mode, "Cliente")
     
     def _create_widgets(self):
         """Crear widgets del formulario"""
         # Contenedor principal con scroll
-        main_container = ctk.CTkScrollableFrame(
-            self,
-            fg_color="white"
-        )
+        main_container = ctk.CTkScrollableFrame(self, fg_color="white")
         main_container.pack(fill="both", expand=True, padx=20, pady=20)
         
         # SECCIÓN: DATOS PERSONALES
-        personal_header = ctk.CTkFrame(
-            main_container,
-            fg_color="#5b9bd5",
-            corner_radius=8,
-            height=40
-        )
+        personal_header = ctk.CTkFrame(main_container, fg_color="#5b9bd5", corner_radius=8, height=40)
         personal_header.pack(fill="x", pady=(0, 15))
         
         ctk.CTkLabel(
@@ -153,7 +139,7 @@ class ClienteFormDialog(ctk.CTkToplevel):
         self._create_field_label(personal_grid, "NOMBRES (*)", 0, 1)
         self.nombres_entry = ValidatedEntry(
             personal_grid,
-            validator_func=lambda x: (len(x) >= 2, "Mínimo 2 caracteres"),
+            validator_func=lambda x: Validator.validate_nombre(x, "nombre"),
             placeholder_text="Nombres",
             height=35,
             border_width=2,
@@ -165,7 +151,7 @@ class ClienteFormDialog(ctk.CTkToplevel):
         self._create_field_label(personal_grid, "APELLIDO PATERNO (*)", 2, 0)
         self.ap_paterno_entry = ValidatedEntry(
             personal_grid,
-            validator_func=lambda x: (len(x) >= 2, "Mínimo 2 caracteres"),
+            validator_func=lambda x: Validator.validate_nombre(x, "apellido paterno"),
             placeholder_text="Apellido Paterno",
             height=35,
             border_width=2,
@@ -177,7 +163,7 @@ class ClienteFormDialog(ctk.CTkToplevel):
         self._create_field_label(personal_grid, "APELLIDO MATERNO (*)", 2, 1)
         self.ap_materno_entry = ValidatedEntry(
             personal_grid,
-            validator_func=lambda x: (len(x) >= 2, "Mínimo 2 caracteres"),
+            validator_func=lambda x: Validator.validate_nombre(x, "apellido materno"),
             placeholder_text="Apellido Materno",
             height=35,
             border_width=2,
@@ -186,12 +172,7 @@ class ClienteFormDialog(ctk.CTkToplevel):
         self.ap_materno_entry.grid(row=3, column=1, padx=(10, 0), pady=(0, 15), sticky="ew")
         
         # SECCIÓN: DATOS DE CONTACTO
-        contact_header = ctk.CTkFrame(
-            main_container,
-            fg_color="#5b9bd5",
-            corner_radius=8,
-            height=40
-        )
+        contact_header = ctk.CTkFrame(main_container, fg_color="#5b9bd5", corner_radius=8, height=40)
         contact_header.pack(fill="x", pady=(10, 15))
         
         ctk.CTkLabel(
@@ -211,7 +192,7 @@ class ClienteFormDialog(ctk.CTkToplevel):
         self.telefono_entry = ValidatedEntry(
             contact_grid,
             validator_func=Validator.validate_phone,
-            placeholder_text="Teléfono",
+            placeholder_text="Teléfono (9 dígitos)",
             height=35,
             border_width=2,
             border_color="#cbd5e1"
@@ -223,7 +204,7 @@ class ClienteFormDialog(ctk.CTkToplevel):
         self.email_entry = ValidatedEntry(
             contact_grid,
             validator_func=Validator.validate_email,
-            placeholder_text="Email",
+            placeholder_text="correo@ejemplo.com",
             height=35,
             border_width=2,
             border_color="#cbd5e1"
@@ -234,8 +215,8 @@ class ClienteFormDialog(ctk.CTkToplevel):
         self._create_field_label(contact_grid, "DIRECCIÓN (*)", 2, 0, columnspan=2)
         self.direccion_entry = ValidatedEntry(
             contact_grid,
-            validator_func=lambda x: (len(x) >= 5, "Mínimo 5 caracteres"),
-            placeholder_text="Dirección",
+            validator_func=Validator.validate_direccion,
+            placeholder_text="Av. Principal 123, Distrito",
             height=35,
             border_width=2,
             border_color="#cbd5e1"
@@ -244,12 +225,7 @@ class ClienteFormDialog(ctk.CTkToplevel):
         
         # SECCIÓN: MASCOTAS REGISTRADAS (solo en modo edit/view)
         if self.mode in ["edit", "view"] and self.cliente:
-            mascotas_header = ctk.CTkFrame(
-                main_container,
-                fg_color="#5b9bd5",
-                corner_radius=8,
-                height=40
-            )
+            mascotas_header = ctk.CTkFrame(main_container, fg_color="#5b9bd5", corner_radius=8, height=40)
             mascotas_header.pack(fill="x", pady=(10, 15))
             
             ctk.CTkLabel(
@@ -260,47 +236,37 @@ class ClienteFormDialog(ctk.CTkToplevel):
             ).pack(pady=8)
             
             # Tabla de mascotas
-            mascotas_table = ctk.CTkFrame(main_container, fg_color="white")
-            mascotas_table.pack(fill="x", pady=(0, 20))
+            mascotas_frame = ctk.CTkFrame(main_container, fg_color="#f8fafc", corner_radius=8, border_width=1, border_color="#e2e8f0")
+            mascotas_frame.pack(fill="x", pady=(0, 20))
             
-            # Headers
-            headers = ["NOMBRE", "ESPECIE", "RAZA"]
-            for idx, header in enumerate(headers):
-                ctk.CTkLabel(
-                    mascotas_table,
-                    text=header,
-                    font=ctk.CTkFont(size=11, weight="bold"),
-                    text_color="#64748b"
-                ).grid(row=0, column=idx, padx=10, pady=5, sticky="w")
-            
-            # Datos de mascotas
             mascotas = get_mascotas_by_cliente(self.cliente['id'])
             if mascotas:
-                for idx, mascota in enumerate(mascotas, 1):
-                    ctk.CTkLabel(
-                        mascotas_table,
-                        text=mascota['nombre_mascota'],
-                        font=ctk.CTkFont(size=11)
-                    ).grid(row=idx, column=0, padx=10, pady=3, sticky="w")
+                # Headers
+                header_row = ctk.CTkFrame(mascotas_frame, fg_color="#5b9bd5", corner_radius=8)
+                header_row.pack(fill="x", padx=10, pady=10)
+                
+                ctk.CTkLabel(header_row, text="NOMBRE", font=ctk.CTkFont(size=11, weight="bold"), text_color="white", width=150).pack(side="left", padx=10, pady=8)
+                ctk.CTkLabel(header_row, text="ESPECIE", font=ctk.CTkFont(size=11, weight="bold"), text_color="white", width=100).pack(side="left", padx=10)
+                ctk.CTkLabel(header_row, text="RAZA", font=ctk.CTkFont(size=11, weight="bold"), text_color="white", width=150).pack(side="left", padx=10)
+                ctk.CTkLabel(header_row, text="EDAD", font=ctk.CTkFont(size=11, weight="bold"), text_color="white", width=80).pack(side="left", padx=10)
+                
+                # Datos
+                for mascota in mascotas:
+                    data_row = ctk.CTkFrame(mascotas_frame, fg_color="white")
+                    data_row.pack(fill="x", padx=10, pady=2)
                     
-                    ctk.CTkLabel(
-                        mascotas_table,
-                        text=mascota['especie'],
-                        font=ctk.CTkFont(size=11)
-                    ).grid(row=idx, column=1, padx=10, pady=3, sticky="w")
-                    
-                    ctk.CTkLabel(
-                        mascotas_table,
-                        text=mascota['raza'],
-                        font=ctk.CTkFont(size=11)
-                    ).grid(row=idx, column=2, padx=10, pady=3, sticky="w")
+                    ctk.CTkLabel(data_row, text=mascota['nombre_mascota'], font=ctk.CTkFont(size=11), width=150).pack(side="left", padx=10, pady=5)
+                    ctk.CTkLabel(data_row, text=mascota['especie'], font=ctk.CTkFont(size=11), width=100).pack(side="left", padx=10)
+                    ctk.CTkLabel(data_row, text=mascota['raza'], font=ctk.CTkFont(size=11), width=150).pack(side="left", padx=10)
+                    edad_str = f"{mascota['edad_años']}a {mascota['edad_meses']}m"
+                    ctk.CTkLabel(data_row, text=edad_str, font=ctk.CTkFont(size=11), width=80).pack(side="left", padx=10)
             else:
                 ctk.CTkLabel(
-                    mascotas_table,
-                    text="No hay mascotas registradas",
-                    font=ctk.CTkFont(size=11),
-                    text_color="#94a3b8"
-                ).grid(row=1, column=0, columnspan=3, padx=10, pady=10)
+                    mascotas_frame,
+                    text="📝 No hay mascotas registradas para este cliente",
+                    font=ctk.CTkFont(size=12),
+                    text_color="#64748b"
+                ).pack(pady=20)
         
         # Botones
         if self.mode != "view":
@@ -310,11 +276,11 @@ class ClienteFormDialog(ctk.CTkToplevel):
             # Botón Guardar/Finalizar
             save_btn = ctk.CTkButton(
                 buttons_frame,
-                text="FINALIZAR REGISTRO" if self.mode == "new" else "GUARDAR",
+                text="✓ FINALIZAR REGISTRO" if self.mode == "add" else "💾 GUARDAR CAMBIOS",
                 font=ctk.CTkFont(size=13, weight="bold"),
                 fg_color="#10b981",
                 hover_color="#059669",
-                height=40,
+                height=45,
                 command=self._save
             )
             save_btn.pack(side="left", expand=True, fill="x", padx=(0, 5))
@@ -322,11 +288,11 @@ class ClienteFormDialog(ctk.CTkToplevel):
             # Botón Cancelar
             cancel_btn = ctk.CTkButton(
                 buttons_frame,
-                text="CANCELAR",
+                text="✗ CANCELAR",
                 font=ctk.CTkFont(size=13, weight="bold"),
                 fg_color="#6b7280",
                 hover_color="#4b5563",
-                height=40,
+                height=45,
                 command=self.destroy
             )
             cancel_btn.pack(side="left", expand=True, fill="x", padx=(5, 0))
@@ -334,11 +300,11 @@ class ClienteFormDialog(ctk.CTkToplevel):
             # Solo botón cerrar en modo view
             close_btn = ctk.CTkButton(
                 main_container,
-                text="CERRAR",
+                text="✓ CERRAR",
                 font=ctk.CTkFont(size=13, weight="bold"),
                 fg_color="#6b7280",
                 hover_color="#4b5563",
-                height=40,
+                height=45,
                 command=self.destroy
             )
             close_btn.pack(fill="x", pady=(20, 0))
@@ -403,11 +369,11 @@ class ClienteFormDialog(ctk.CTkToplevel):
         for field_name, entry in fields.items():
             is_valid, error_msg = entry.validate()
             if not is_valid:
-                errors.append(f"{field_name}: {error_msg}")
+                errors.append(f"• {field_name}: {error_msg}")
         
         if errors:
             messagebox.showerror(
-                "Error de validación",
+                "❌ Error de validación",
                 "Por favor corrija los siguientes errores:\n\n" + "\n".join(errors)
             )
             return
@@ -425,13 +391,10 @@ class ClienteFormDialog(ctk.CTkToplevel):
         
         if self.mode == "edit":
             cliente_data["id"] = self.cliente["id"]
-        
-        # Emitir evento
-        event = AppEvents.CLIENTE_UPDATED if self.mode == "edit" else AppEvents.CLIENTE_CREATED
-        self.event_manager.emit(event, cliente_data)
-        
-        # Mostrar notificación
-        msg = "Cliente actualizado correctamente" if self.mode == "edit" else "Cliente agregado correctamente"
-        NotificationManager.show_success(self.master, msg)
+            self.event_manager.emit(AppEvents.CLIENTE_UPDATED, {'cliente': cliente_data})
+            NotificationManager.show_success(self.master, "✓ Cliente actualizado correctamente")
+        else:
+            self.event_manager.emit(AppEvents.CLIENTE_ADDED, {'cliente': cliente_data})
+            NotificationManager.show_success(self.master, "✓ Cliente agregado correctamente")
         
         self.destroy()

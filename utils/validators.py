@@ -16,10 +16,10 @@ class Validator:
             return False, "El DNI es obligatorio"
         
         if not dni.isdigit():
-            return False, "El DNI solo debe contener números"
+            return False, "Solo números"
         
         if len(dni) != 8:
-            return False, "El DNI debe tener 8 dígitos"
+            return False, "Debe tener 8 dígitos"
         
         return True, None
     
@@ -30,32 +30,40 @@ class Validator:
             return False, f"El {campo} es obligatorio"
         
         if len(nombre) < 2:
-            return False, f"El {campo} debe tener al menos 2 caracteres"
+            return False, f"Mínimo 2 caracteres"
         
         if len(nombre) > 50:
-            return False, f"El {campo} no puede exceder 50 caracteres"
+            return False, f"Máximo 50 caracteres"
         
         if not re.match(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', nombre):
-            return False, f"El {campo} solo puede contener letras"
+            return False, f"Solo letras"
+        
+        return True, None
+    
+    @staticmethod
+    def validate_phone(telefono: str) -> Tuple[bool, Optional[str]]:
+        """Validar teléfono peruano (9 dígitos, empieza con 9)"""
+        if not telefono:
+            return False, "El teléfono es obligatorio"
+        
+        # Eliminar espacios
+        telefono = telefono.strip()
+        
+        if not telefono.isdigit():
+            return False, "Solo números"
+        
+        if len(telefono) != 9:
+            return False, "Debe tener 9 dígitos"
+        
+        if not telefono.startswith('9'):
+            return False, "Debe comenzar con 9"
         
         return True, None
     
     @staticmethod
     def validate_telefono(telefono: str) -> Tuple[bool, Optional[str]]:
-        """Validar teléfono peruano (9 dígitos, empieza con 9)"""
-        if not telefono:
-            return False, "El teléfono es obligatorio"
-        
-        if not telefono.isdigit():
-            return False, "El teléfono solo debe contener números"
-        
-        if len(telefono) != 9:
-            return False, "El teléfono debe tener 9 dígitos"
-        
-        if not telefono.startswith('9'):
-            return False, "El teléfono debe comenzar con 9"
-        
-        return True, None
+        """Alias para validate_phone"""
+        return Validator.validate_phone(telefono)
     
     @staticmethod
     def validate_email(email: str) -> Tuple[bool, Optional[str]]:
@@ -65,7 +73,7 @@ class Validator:
         
         pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(pattern, email):
-            return False, "Email inválido (ejemplo: usuario@dominio.com)"
+            return False, "Email inválido"
         
         return True, None
     
@@ -76,10 +84,10 @@ class Validator:
             return False, "La dirección es obligatoria"
         
         if len(direccion) < 5:
-            return False, "La dirección debe tener al menos 5 caracteres"
+            return False, "Mínimo 5 caracteres"
         
         if len(direccion) > 200:
-            return False, "La dirección no puede exceder 200 caracteres"
+            return False, "Máximo 200 caracteres"
         
         return True, None
     
